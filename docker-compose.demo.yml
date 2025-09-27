@@ -8,6 +8,7 @@ services:
       - ./keys/useradm/private.key:/etc/useradm/rsa/private.pem
     environment:
       USERADM_SERVER_PRIV_KEY_PATH: /etc/useradm/rsa/private.pem
+      MONGO_URL: mongodb://mender-mongo:27017
     networks:
       - mender
 
@@ -18,12 +19,15 @@ services:
       - ./keys/deviceauth/private.key:/etc/deviceauth/rsa/private.pem
     environment:
       DEVICEAUTH_SERVER_PRIV_KEY_PATH: /etc/deviceauth/rsa/private.pem
+      MONGO_URL: mongodb://mender-mongo:27017
     networks:
       - mender
 
   mender-inventory:
     image: mendersoftware/inventory:mender-3.7.0
     command: server --automigrate
+    environment:
+      MONGO_URL: mongodb://mender-mongo:27017
     networks:
       - mender
 
@@ -38,11 +42,13 @@ services:
       DEPLOYMENTS_AWS_AUTH_SECRET: minio123
       DEPLOYMENTS_AWS_URI: http://minio:9000
       DEPLOYMENTS_AWS_EXTERNAL_URI: https://s3.docker.mender.io
+      DEPLOYMENTS_STORAGE_BUCKET: mender-artifact-storage
+      MONGO_URL: mongodb://mender-mongo:27017
     depends_on:
       - mender-mongo
     networks:
       - mender
-  
+
   mender-api-gateway:
     image: traefik:v2.2
     ports:
@@ -75,6 +81,27 @@ services:
       - ./config/traefik/traefik.tls.yaml:/etc/traefik/config/traefik.tls.yaml:ro
       - ./cert/cert.crt:/etc/traefik/certs/cert.crt
       - ./cert/private.key:/etc/traefik/certs/private.key
+
+  mender-gui:
+    image: mendersoftware/gui:mender-3.7.0
+    environment:
+      DEMO: "true"
+    networks:
+      - mender
+
+  minio:
+    image: minio/minio:latest
+    command: server /export
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    volumes:
+      - minio-data:/export
+    networks:
+      mender:
+        aliases:
+          - minio
+
   mender-mongo:
     image: mongo:4.4
     volumes:
@@ -84,7 +111,7 @@ services:
 
 volumes:
   mender-mongo-db:
+  minio-data:
 
 networks:
   mender:
-
